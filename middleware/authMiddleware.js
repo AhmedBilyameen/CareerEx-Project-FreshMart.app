@@ -5,7 +5,7 @@ exports.protect = async (req, res, next) => {
 
   let token = req.headers.authorization?.split(' ')[1]
 
-  if (!token) return res.status(401).json({ message: 'Not authorized, no token' })
+  if (!token) return res.status(401).json({ message: 'Not authorized, please login' })
 
   try {
 
@@ -16,7 +16,7 @@ exports.protect = async (req, res, next) => {
 
   } catch (err) {
 
-    res.status(401).json({ message: 'Not authorized, token failed' })
+    res.status(401).json({ message: 'Not authorized, Please login again!' })
 
   }
 };
@@ -30,4 +30,4 @@ exports.admin = (req, res, next) => {
   } else {
     return res.status(403).json({ message: 'Access denied, admin only' })
   }
-};
+}

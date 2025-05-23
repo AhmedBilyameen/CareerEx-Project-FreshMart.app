@@ -1,12 +1,15 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+const User = require('../models/User')
+const jwt = require('jsonwebtoken')
+const sendEmail = require('../utils/sendEmail')
+const { generateAccessToken, generateRefreshToken } = require('../utils/generateTokens')
+const crypto = require('crypto')
 
-const generateToken = (user) => {
-  return jwt.sign(
-    { id: user?._id, role: user?.role }, 
-    process.env.ACCESS_TOKEN, 
-    { expiresIn: '1d' });
-};
+// const generateToken = (user) => {
+//   return jwt.sign(
+//     { id: user?._id, role: user?.role }, 
+//     process.env.ACCESS_TOKEN, 
+//     { expiresIn: '5h' });
+// };
 
 exports.register = async (req, res) => {
 
@@ -21,21 +24,42 @@ exports.register = async (req, res) => {
 
     const user = await User.create({ firstName, lastName, phoneNo, email, password, role })
 
-    res.status(201).json({
-      message: 'User registered',
-      userInfo: {
-        Firstname: user?.firstName, 
-        Lastname: user?.lastName, 
-        PhoneNumber: user?.phoneNo,
-        Email : user?.email
-      },
-      token: generateToken(user)
+    await sendEmail({
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`,
+      subject: 'Welcome to FreshMart',
+      message: '<p>Thanks for signing up at FreshMart!</p> <br>   Your account has been successfully created!',
+      buttonLink: 'https://freshmart.com/dashboard',
+      buttonText: 'Go to Dashboard',
     });
+
+    const refreshToken = generateRefreshToken(user)
+    user.refreshToken = refreshToken
+    await user.save()
+
+    res
+      .cookie(`refreshToken`, refreshToken, {
+        httpOnly: true,
+        secure: false, // I will set this to true in production
+        sameSite: `strict`,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .status(201)
+      .json({
+        message: 'User registered',
+        userInfo: {
+          Firstname: user?.firstName, 
+          Lastname: user?.lastName, 
+          PhoneNumber: user?.phoneNo,
+          Email : user?.email
+        },
+        accessToken: generateAccessToken(user)
+      });
 
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
-};
+}
 
 exports.login = async (req, res) => {
 
@@ -51,11 +75,100 @@ exports.login = async (req, res) => {
 
     }
 
-    res.json({
-      message: 'Login successful',
-      token: generateToken(user)
-    });
+    const refreshToken = generateRefreshToken(user)
+    user.refreshToken = refreshToken
+    await user.save()
+
+    res
+      .cookie(`refreshToken`, refreshToken, {
+        httpOnly: true,
+        secure: false, // I will set this to true in production
+        sameSite: `strict`,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .json({
+        message: 'Login successful',
+        token: generateAccessToken(user)
+      });
+
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
-};
+}
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  let user
+
+  try {
+    user = await User.findOne({ email })
+    
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    const resetToken = user.getResetPasswordToken()
+
+    await user.save({ validateBeforeSave: false })
+
+    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+    const text = `
+      <h4>Your request to reset your password.</h4>
+      <p>Click the link below to reset your password. This link is valid for 10 minutes:</p>
+      <a href="${resetUrl}" style="color:blue;">Reset Password</a>
+      <p>If you do not request this, you can ignore this email.</p>
+    `;
+
+    // await sendEmail({
+    //   to: user.email,
+    //   subject: 'Password Reset Request',
+    //   html: message,
+    // });
+
+    try {
+      await sendEmail({
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
+        subject: 'Password Reset Request',
+        message : text
+      })
+
+    } catch (error) {
+      console.error('Failed to send email', error.message);
+      return res.status(500).json({ message: 'Failed to send email' });
+    }
+    
+    // console.log( resetToken )
+    res.status(200).json({ message: 'Reset email sent successfully' });
+
+  } catch (err) {
+    console.error(err)
+    if (user) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+    }
+    res.status(500).json({ message: 'Email could not be sent' });
+  }
+}
+
+exports.resetPassword = async (req, res) => {
+  const resetToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: resetToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    const { password } = req.body;
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successful. You can now log in.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+}
