@@ -17,7 +17,7 @@ dotenv.config()
 const app = express()
 
 
-// Middleware to parse json body
+// Middleware to parse json body as json type
 app.use(express.json())
 app.use(cookieParser())
 
