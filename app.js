@@ -38,10 +38,10 @@ connectDB();
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
-});
+})
 
 // Basic route
 app.get("/", (req, res) => {
     res.send("Welcome to FreshMart APP")
-});
+})
 
