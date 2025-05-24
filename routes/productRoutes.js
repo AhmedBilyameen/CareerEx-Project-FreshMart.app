@@ -4,13 +4,16 @@ const router = express.Router()
 const { 
     createProduct,
     getAllProducts,
-    getProductById
+    getProductById,
+    getProductsByCategory
 } = require('../controllers/productController')
 
 const { protect, admin } = require('../middleware/authMiddleware')
 
-router.post('/create', protect, admin, createProduct)
+
 router.get('/', getAllProducts)
+router.post('/create', protect, admin, createProduct)
+router.get('/by-category', getProductsByCategory)
 router.get('/:id', getProductById)
 
 module.exports = router
