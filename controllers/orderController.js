@@ -2,21 +2,58 @@ const Order = require('../models/Order')
 const sendEmail = require('../utils/sendEmail')
 const Product = require('../models/Product')
 
-exports.getAllOrders = async (req, res) => {
+// exports.getAllOrders = async (req, res) => {
 
-    try {
-        const orders = await Order.find().populate('user')
-            .populate('orderItems')
-            .populate('user', 'firstName lastName email phoneNo')
+//     try {
+//         const orders = await Order.find()
+//             .populate('orderItems.product', 'name price')
+//             .populate('user', 'firstName lastName email phoneNo')
         
-        res.status(200).json({ count: orders.length, orders })
+//         res.status(200).json({ count: orders.length, orders })
 
-        } catch (error) {
-            res.status(500).json({ message: error.message })
-            }        
-} //ERROR HERE
+//         } catch (error) {
+//             res.status(500).json({ message: error.message })
+//             }        
+// }
 
-// user all placed orders
+
+  // @desc   Admin: Get all orders with optional filters--- All oreders, userId, status, dateRange,
+// @route  GET /api/orders/admin
+// @access Private/Admin
+
+exports.getAllOrdersAdmin = async (req, res) => {
+  try {
+    const { status, user, startDate, endDate } = req.query
+    let filter = {}
+
+    // Filter by order status
+    if (status) {
+      filter.status = status
+    }
+
+    // Filter by user (by ID)
+    if (user) {
+      filter.user = user
+    }
+
+    // Optional: Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {}
+      if (startDate) filter.createdAt.$gte = new Date(startDate)
+      if (endDate) filter.createdAt.$lte = new Date(endDate)
+    }
+
+    const orders = await Order.find(filter)
+      .populate('user', 'firstName lastName email phoneNo')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ count: orders.length, orders })
+
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+// user all placed orders (owner)
 exports.getUserOrders = async (req, res) => {
     try {
       const orders = await Order.find({ user: req.user._id })
@@ -32,73 +69,163 @@ exports.getUserOrders = async (req, res) => {
       res.status(500).json({ message: 'Something went wrong while fetching orders' });
     }
   }
-
 exports.placeOrder = async (req, res) => {
-  const { orderItems, shippingAddress, paymentMethod } = req.body;
+  const { orderItems, shippingAddress, paymentMethod } = req.body
 
   if (!orderItems || orderItems.length === 0) {
-    return res.status(400).json({ message: 'No order items' });
+    return res.status(400).json({ message: 'No order items' })
   }
 
   try {
 
     let itemsPrice = 0
+    const enrichedOrderItems = []
 
     for (const item of orderItems) {
-        const product = await Product.findById(item.product);
+        const product = await Product.findById(item.product)
+          
         if (!product) {
-          return res.status(404).json({ message: 'Product not found' });
+          return res.status(404).json({ message: 'Product not found' })
         }
-  
-        itemsPrice += product.price * item.quantity;
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ message: `Not enough stock for ${item.product}` })
+        }
+
+        // Calculate price
+        const itemTotal = product.price * item.quantity
+        itemsPrice += itemTotal
+
+        // Reduce stock for each product
+        product.stock -= item.quantity
+        await product.save()
+
+        // Add enriched item
+        enrichedOrderItems.push({
+          product: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity
+        })
       }
     itemsPrice = parseFloat(itemsPrice.toFixed(2))
     const taxPrice = parseFloat((0.1 * itemsPrice).toFixed(2)); // 10% tax
     const shippingPrice = itemsPrice > 100000 ? 0 : 10; // Free shipping if total > 100k
     const totalPrice = parseFloat((itemsPrice + taxPrice + shippingPrice).toFixed(2))
-
-    // totalPrice = Number(totalPrice)
-
+    
+    //create order
     const order = await Order.create({
       user: req.user._id, //
-      orderItems,
+      orderItems : enrichedOrderItems,
       shippingAddress,
       paymentMethod,
       itemsPrice,
       taxPrice,
       shippingPrice,
       totalPrice,
-    });
+    })
 
-    res.status(201).json(order);
+     // Construct email message
+     const emailMessage = `
+     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto;">
+   
+       <p>
+         Thank you for placing an order with <strong style="color: #2E8B57;">FreshMart</strong>!<br>
+         Your order <strong>#${order._id}</strong> has been successfully placed and is currently 
+         <span style="color: orange;"><strong>pending payment</strong></span>.
+       </p>
+   
+       <h3 style="margin-top: 30px;">🛒 Order Summary</h3>
+       <table style="width: 100%; border-collapse: collapse;">
+         <thead>
+           <tr style="background-color: #f0f0f0;">
+             <th align="left" style="padding: 8px;">Product</th>
+             <th align="center" style="padding: 8px;">Quantity</th>
+             <th align="right" style="padding: 8px;">Price</th>
+             <th align="right" style="padding: 8px;">Subtotal</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${enrichedOrderItems.map(item => `
+             <tr>
+               <td style="padding: 8px;">${item.name}</td>
+               <td align="center" style="padding: 8px;">${item.quantity}</td>
+               <td align="right" style="padding: 8px;">$${item.price.toFixed(2)}</td>
+               <td align="right" style="padding: 8px;">$${(item.price * item.quantity).toFixed(2)}</td>
+             </tr>
+           `).join('')}
+         </tbody>
+       </table>
+   
+       <hr style="margin: 20px 0;">
+   
+       <p><strong>Items Total:</strong> $${itemsPrice.toFixed(2)}</p>
+       <p><strong>Tax (10%):</strong> $${taxPrice.toFixed(2)}</p>
+       <p><strong>Shipping:</strong> $${shippingPrice.toFixed(2)}</p>
+       <p style="font-size: 18px; font-weight: bold; margin-top: 10px;">
+         Total Amount: $${totalPrice.toFixed(2)}
+       </p>
+   
+       <p style="margin-top: 20px;">
+         🕒 <strong>Estimated Delivery:</strong> 3–5 business days after payment confirmation.
+       </p>
+   
+       <p style="margin-top: 30px;">
+         👉 <a href="https://your-payment-url.com" style="background-color: #2E8B57; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+           Click here to complete your payment
+         </a>
+       </p>
+   
+       <center><p style="margin-top: 30px;">
+         If you didn’t place this order or need help, contact our support team immediately.
+       </p></center>
+   
+       <br>
+       <p style="color: #888;">— The FreshMart Team</p>
+     </div>
+   `;
+   
+
+   // Send email
+   await sendEmail({
+     name : req.user.firstName,
+     email: req.user.email,
+     subject: 'Order Confirmation - FreshMart',
+     message: emailMessage,
+   });
+
+   res.status(201).json({
+    message: 'Order placed successfully and email sent.',
+    order,
+  })
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 }
-//sent noti. ur order with id is pending payment proceed to make a payment
-
 // @desc    Get all orders by user ID (Admin only)
 // @route   GET /api/orders/:userId
 // @access  Private/Admin
-exports.getOrdersByUserId = async (req, res) => {
-    try {
-      const orders = await Order.find({ user: req.params.userId })
-        .populate('user', 'firstName lastName email')
-        .populate('orderItems.product', 'name price');
+// exports.getOrdersByUserId = async (req, res) => {
+//     try {
+//       const orders = await Order.find({ user: req.params.userId })
+//         .populate('user', 'firstName lastName email')
+//         .populate('orderItems.product', 'name price');
   
-      if (!orders.length) {
-        return res.status(404).json({ message: 'No orders found for this user' });
-      }
+//       if (!orders.length) {
+//         return res.status(404).json({ message: 'No orders found for this user' });
+//       }
   
-      res.status(200).json({ count: orders.length, orders });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  }
+//       res.status(200).json({ count: orders.length, orders });
+//     } catch (error) {
+//       res.status(500).json({ message: error.message });
+//     }
+//   }
 
 // @desc Mark order as paid
 // @route PUT /api/orders/:id/pay
 // @access Private/Admin or after payment webhook
+
 exports.markOrderAsPaid = async (req, res) => {
     try {
       const order = await Order.findById(req.params.id);
@@ -117,12 +244,10 @@ exports.markOrderAsPaid = async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   }
-  
-
-  // @desc Update order status (e.g., pending → processing → completed)
+  // @desc Update order status (pending, processing, completed)
   // @route PUT /api/orders/:id/status
   // @access Private/Admin
-  exports.updateOrderStatus = async (req, res) => {
+exports.updateOrderStatus = async (req, res) => {
     const { status } = req.body;
   
     const allowedStatuses = ['pending', 'processing', 'completed', 'cancelled'];
@@ -131,21 +256,66 @@ exports.markOrderAsPaid = async (req, res) => {
     }
   
     try {
-      const order = await Order.findById(req.params.id);
+      const order = await Order.findById(req.params.id)
+          .populate('user', 'firstName email')
+
       if (!order) return res.status(404).json({ message: 'Order not found' });
   
       order.status = status;
-      const updatedOrder = await order.save();
+      const updatedOrder = await order.save()
+
+      // Construct status-based email
+    let emailMessage = '';
+
+    if (status === 'processing') {
+      emailMessage = `
+
+        <p>We’ve received your payment for order <strong>#${order._id}</strong>. Your order is now being <strong>processed</strong>.</p>
+        
+        <p>Our team is preparing your items and we’ll notify you once your order is on the way.</p>
+        
+        <p>If you have any questions, feel free to reach out.</p>
+        
+        <br>
+        <p>Thank you for shopping with us!</p>
+        <p><strong>— The FreshMart Team</strong></p>
+      
+      `;
+    } else if (status === 'completed') {
+      emailMessage = `
+
+        <p>We’re happy to let you know that your order <strong>#${order._id}</strong> has been <strong>delivered successfully</strong>.</p>
+        
+        <p>We hope everything arrived in great condition. Thank you for choosing FreshMart!</p>
+        
+        <p>If you have any feedback, we’d love to hear from you.</p>
+        
+        <br>
+        <p>Warm regards,</p>
+        <p><strong>— The FreshMart Team</strong></p>
+      
+      `;
+    }
+
+    // Send email if status is relevant
+    if (emailMessage) {
+      await sendEmail({
+        name: order.user.firstName,
+        email: order.user.email,
+        subject: `Order Update - Status: ${status.toUpperCase()}`,
+        message: emailMessage,
+      });
+    }
+
   
       res.status(200).json({
-        message: `Order status updated to "${status}"`,
+        message: `Order status updated to "${status}" and notification sent`,
         order: updatedOrder,
       });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   }
-  // NOTI: your order with id has been paid and mark completed
 
 // @desc Cancel an order
 // @route PUT /api/orders/:id/cancel
@@ -226,6 +396,10 @@ exports.cancelOrder = async (req, res) => {
       res.status(500).json({ message: error.message })
     }
   }
+
+  //updateOrder(Owner)...
+  //deleteOrder(admin) -- make sure the order to be deleted is a cancelled order
   
-  
+
+
   

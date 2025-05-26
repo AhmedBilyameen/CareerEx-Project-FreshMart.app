@@ -14,9 +14,9 @@ exports.protect = async (req, res, next) => {
     req.user = await User.findById(decoded.id).select('-password')
     next()
 
-  } catch (err) {
+  } catch (error) {
 
-    res.status(401).json({ message: 'Not authorized, Please login again!' })
+    res.status(401).json({ message: 'Not authorized, Please login again!', Error : error.message })
 
   }
 };

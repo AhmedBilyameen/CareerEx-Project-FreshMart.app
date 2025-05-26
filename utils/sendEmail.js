@@ -32,6 +32,7 @@ const sendEmail = async (options) => {
               padding: 40px;
               border-radius: 8px;
               box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+              border-top: 6px solid #27ae60
             }
             .header {
               text-align: center;
@@ -72,7 +73,7 @@ const sendEmail = async (options) => {
               <h2>FreshMart</h2>
             </div>
             <div class="content">
-              <h2>Hello ${options.name || 'User'},</h2>
+              <h2 style="color: #2E8B57;">Hello ${options.name || 'User'},</h2>
               <p>${options.message}</p>
               ${options.buttonLink ? `<a href="${options.buttonLink}" class="btn">${options.buttonText || 'View'}</a>` : ''}
             </div>

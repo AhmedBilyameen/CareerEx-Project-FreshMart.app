@@ -16,16 +16,12 @@ const orderRoutes = require('./routes/orderRoutes')
 dotenv.config()
 const app = express()
 
-
-// Middleware to parse json body as json type
-app.use(express.json())
+app.use(express.json())// Middleware to parse json body as json type
 app.use(cookieParser())
 
 //ROUTES--------------
-app.use('/', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes)
-//view cartegories - admin and users
-//view all product - admin and users
 app.use('/api/products', productRoutes)
 app.use('/api/orders', orderRoutes);
 

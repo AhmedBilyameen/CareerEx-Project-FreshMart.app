@@ -7,19 +7,20 @@ const {
     markOrderAsPaid,
     updateOrderStatus,
     cancelOrder,
-    getAllOrders
+    getAllOrders,
+    getAllOrdersAdmin
 } = require('../controllers/orderController');
 const { protect, admin} = require('../middleware/authMiddleware');
 
-router.get('/', protect, admin, getAllOrders) 
+// router.get('/admin', protect, admin, getAllOrders) 
+router.get('/admin', protect, admin, getAllOrdersAdmin)
 router.post('/create', protect, placeOrder)
 router.get('/my-orders', protect, getUserOrders)
-router.get('/:userId', protect, admin, getOrdersByUserId) //view all orders by user ID admin only
-
+// router.get('/:userId', protect, admin, getOrdersByUserId) //view all orders by user ID admin only
 // Mark as paid
-router.put('/:id/pay', protect, markOrderAsPaid);
+router.put('/:id/pay', protect, admin, markOrderAsPaid);
 // Update status
-router.put('/:id/status', protect, admin, updateOrderStatus);
+router.put('/:id/status', protect, admin, updateOrderStatus); 
 // Cancel order
 router.put('/:id/cancel', protect, cancelOrder);
 

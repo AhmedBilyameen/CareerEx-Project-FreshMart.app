@@ -42,7 +42,7 @@ exports.register = async (req, res) => {
         httpOnly: true,
         secure: false, // I will set this to true in production
         sameSite: `strict`,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000,  //for 7days
       })
       .status(201)
       .json({
@@ -170,5 +170,49 @@ exports.resetPassword = async (req, res) => {
     res.status(200).json({ message: 'Password reset successful. You can now log in.' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+}
+
+exports.logout = async (req, res) => {
+
+  const token = req.cookies.refreshToken;
+  
+  if (!token) return res.sendStatus(204); // No content
+  
+  try {
+      const user = await User.findOne({ refreshToken: token });
+  
+      if (user) {
+      user.refreshToken = null;
+      await user.save();
+      }
+      res.clearCookie('refreshToken').json({ message: 'Logged out successfully' });
+  } catch {
+      res.status(500).json({ message: 'Logout failed' });
+  }
+  }
+
+exports.refreshToken = async (req, res) => {
+
+  const token = req.cookies.refreshToken;
+
+  if (!token) return res.status(401).json({ message: 'No refresh token' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN);
+
+    const user = await User.findById(decoded.id)
+    if (!user || user.refreshToken !== token) {
+      return res.status(403).json({ message: 'Invalid refresh token' });
+    }
+
+    const accessToken = generateAccessToken(user);
+    res.json({ accessToken });
+
+    // console.log('Cookies:', req.cookies);
+    // console.log('Refresh token from cookie:', req.cookies.refreshToken);
+
+  } catch (err) {
+    res.status(401).json({ message: 'Refresh token expired or invalid', error: err.message });
   }
 }
