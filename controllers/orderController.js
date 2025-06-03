@@ -17,10 +17,9 @@ const Product = require('../models/Product')
 // }
 
 
-  // @desc   Admin: Get all orders with optional filters--- All oreders, userId, status, dateRange,
-// @route  GET /api/orders/admin
-// @access Private/Admin
-
+/* @desc   Admin: Get all orders with optional filters--- All oreders, userId, status, dateRange,
+ @route  GET /api/orders/admin
+ @access Private/Admin*/
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
     const { status, user, startDate, endDate } = req.query
@@ -53,22 +52,7 @@ exports.getAllOrdersAdmin = async (req, res) => {
     res.status(500).json({ message: error.message })
   }
 }
-// user all placed orders (owner)
-exports.getUserOrders = async (req, res) => {
-    try {
-      const orders = await Order.find({ user: req.user._id })
-        .populate('orderItems.product', 'name price');
-      
-      if (!orders || orders.length === 0) {
-        return res.status(404).json({ message: 'No orders found for this user' });
-      }
-  
-      res.status(200).json(orders);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Something went wrong while fetching orders' });
-    }
-  }
+
 exports.placeOrder = async (req, res) => {
   const { orderItems, shippingAddress, paymentMethod } = req.body
 
@@ -228,20 +212,20 @@ exports.placeOrder = async (req, res) => {
 
 exports.markOrderAsPaid = async (req, res) => {
     try {
-      const order = await Order.findById(req.params.id);
-      if (!order) return res.status(404).json({ message: 'Order not found' });
+      const order = await Order.findById(req.params.id)
+      if (!order) return res.status(404).json({ message: 'Order not found' })
   
       order.isPaid = true;
-      order.paidAt = new Date();
+      order.paidAt = new Date()
   
-      const updatedOrder = await order.save();
+      const updatedOrder = await order.save()
   
       res.status(200).json({
         message: 'Order marked as paid',
         order: updatedOrder,
       });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error.message })
     }
   }
   // @desc Update order status (pending, processing, completed)
@@ -250,7 +234,7 @@ exports.markOrderAsPaid = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     const { status } = req.body;
   
-    const allowedStatuses = ['pending', 'processing', 'completed', 'cancelled'];
+    const allowedStatuses = ['pending', 'processing', 'completed'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
     }
@@ -304,7 +288,7 @@ exports.updateOrderStatus = async (req, res) => {
         email: order.user.email,
         subject: `Order Update - Status: ${status.toUpperCase()}`,
         message: emailMessage,
-      });
+      }) 
     }
 
   
@@ -321,8 +305,13 @@ exports.updateOrderStatus = async (req, res) => {
 // @route PUT /api/orders/:id/cancel
 // @access Private (user or admin)
 exports.cancelOrder = async (req, res) => {
+    const { id } = req.params
+    const { status } = req.body
+
     try {
-      const order = await Order.findById(req.params.id).populate('user')
+      const order = await Order.findById(id)
+      .populate('user')
+      .populate('orderItems.product')
   
       if (!order) return res.status(404).json({ message: 'Order not found' })
   
@@ -330,21 +319,34 @@ exports.cancelOrder = async (req, res) => {
     if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Not authorized to cancel this order' })
     }
-      // Only pending orders can be cancelled by users
+      // Only pending orders can be cancelled by user(owner) but admin can be able to cancelled other status orders
       if (order.status !== 'pending' && req.user.role !== 'admin') {
-        return res.status(400).json({ message: 'Only pending orders can be cancelled' });
+        return res.status(400).json({ message: 'Only pending orders can be cancelled' })
       }
 
+    if (order.status === 'cancelled') {
+        return res.status(400).json({ message: 'Order is already cancelled' })
+    }
 
-    // if (order.status === 'cancelled') {
-    //     return res.status(400).json({ message: 'Order is already cancelled' });
-    // }
+    const previousStatus = order.status;
+
+    // Restore stock if status is changing to 'cancelled' and it was not previously cancelled
+    if (status === 'cancelled' && previousStatus !== 'cancelled') {
+      for (const item of order.orderItems) {
+        const product = await Product.findById(item.product._id)
+
+        if (product) {
+          product.stock += item.quantity
+          await product.save()
+        }
+      }
+    }
   
-      order.status = 'cancelled';
-      order.isPaid = false;
-      order.paidAt = null;
+      order.status = status
+      order.isPaid = false
+      order.paidAt = null
   
-      const updatedOrder = await order.save();
+      const updatedOrder = await order.save()
     //   console.log(order.user.email)
 
         // 📨 Send Notification Email to User
@@ -384,7 +386,7 @@ exports.cancelOrder = async (req, res) => {
             })
 
         } catch (emailError) {
-            console.error('Failed to send notification email:', emailError.message);
+            console.error('Failed to send notification email:', emailError.message)
             // Don't stop execution if email fails
         }
   
@@ -397,7 +399,7 @@ exports.cancelOrder = async (req, res) => {
     }
   }
 
-  //updateOrder(Owner)...
+  //updateOrder(Owner)... owner should be able to update his/her order
   //deleteOrder(admin) -- make sure the order to be deleted is a cancelled order
   
 

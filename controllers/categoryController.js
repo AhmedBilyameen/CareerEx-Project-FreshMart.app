@@ -1,5 +1,6 @@
 const Category = require('../models/Category')
 
+//CreateCategory
 exports.createCategory = async (req, res) => {
 
   try {
@@ -15,8 +16,8 @@ exports.createCategory = async (req, res) => {
     res.status(500).json({ message: err.message })
     
   }
-};
-
+}
+//ReadCategory
 exports.getAllCategories = async (req, res) => {
   try {
     const categories = await Category.find();
@@ -24,4 +25,7 @@ exports.getAllCategories = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+}
+
+//editCategory
+//deleteCategory

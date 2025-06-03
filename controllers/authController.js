@@ -97,7 +97,7 @@ exports.login = async (req, res) => {
 }
 
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  const { email } = req.body
   let user
 
   try {
@@ -151,15 +151,15 @@ exports.forgotPassword = async (req, res) => {
 }
 
 exports.resetPassword = async (req, res) => {
-  const resetToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+  const resetToken = crypto.createHash('sha256').update(req.params.token).digest('hex')
 
   try {
     const user = await User.findOne({
       resetPasswordToken: resetToken,
       resetPasswordExpire: { $gt: Date.now() },
-    });
+    })
 
-    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+    if (!user) return res.status(400).json({ message: 'Reset link has expired or is invalid. Please request a new one' });
 
     const { password } = req.body;
     user.password = password;
@@ -216,3 +216,6 @@ exports.refreshToken = async (req, res) => {
     res.status(401).json({ message: 'Refresh token expired or invalid', error: err.message });
   }
 }
+
+//login with google
+//login with facebook

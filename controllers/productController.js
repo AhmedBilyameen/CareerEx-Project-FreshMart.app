@@ -21,8 +21,20 @@ exports.createProduct = async (req, res) => {
 
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find()
+    const { keyword } = req.query
+
+    const query = {}
+
+    if (keyword){
+      query.name = { $regex: keyword, $options: 'i' }
+    }
+
+    const products = await Product.find(query)
+    if (products.length === 0) {
+      return res.status(404).json({message: 'No products found'})
+    }
     res.json({ count : products.length, products })
+
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -103,7 +115,7 @@ exports.updateProduct = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+}
 
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;

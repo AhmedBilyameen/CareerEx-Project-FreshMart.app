@@ -46,6 +46,82 @@ exports.resetPasswordValidation = [
     .matches(/^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/),
 ];
 
+//productValidation
+exports.productValidation = [
+  body('name')
+    .notEmpty()
+    .withMessage('Product name is required'),
+
+  body('price')
+    .isFloat({ gt: 0 })
+    .withMessage('Price must be a number greater than 0'),
+
+  body('stock')
+    .isInt({ min: 0 })
+    .withMessage('Stock must be a non-negative integer'),
+
+  body('category')
+    .notEmpty()
+    .withMessage('Category is required'),
+];
+
+//orderValidation
+exports.placeOrderValidation = [
+  // Ensure orderItems is an array and not empty
+  body('orderItems')
+    .isArray({ min: 1 })
+    .withMessage('Order must contain at least one item'),
+
+  // Validate each item in orderItems
+  body('orderItems.*.product')
+    .notEmpty()
+    .withMessage('Product ID is required for each item'),
+
+  body('orderItems.*.quantity')
+    .isInt({ min: 1 })
+    .withMessage('Quantity must be at least 1 for each item'),
+
+  // Shipping address fields
+  body('shippingAddress.address')
+    .notEmpty()
+    .withMessage('Shipping address is required'),
+
+  body('shippingAddress.city')
+    .notEmpty()
+    .withMessage('City is required'),
+
+  body('shippingAddress.postalCode')
+    .notEmpty()
+    .withMessage('Postal code is required'),
+
+  body('shippingAddress.country')
+    .notEmpty()
+    .withMessage('Country is required'),
+
+  // Payment method
+  body('paymentMethod')
+    .notEmpty()
+    .withMessage('Payment method is required'),
+
+  // Optional but strict if provided
+  body('status')
+    .optional()
+    .isIn(['pending', 'processing', 'completed', 'cancelled'])
+    .withMessage('Invalid status type'),
+];
+//categoryValidation
+exports.categoryValidation = [
+  body('name')
+    .notEmpty()
+    .withMessage('Category name is required'),
+
+  body('description')
+    .optional()
+    .isString()
+    .withMessage('Description must be a string'),
+];
+//userValidation
+
 
 
 
