@@ -7,7 +7,8 @@ const {
     getProductById,
     getProductsByCategory,
     deleteProduct,
-    updateProduct
+    updateProduct,
+    getLowStockProducts
 } = require('../controllers/productController')
 
 const { protect, admin } = require('../middleware/authMiddleware')
@@ -18,9 +19,11 @@ const validateResults = require('../middleware/validateResults')
 router.get('/', getAllProducts)
 router.post('/create', protect, admin, productValidation, validateResults, createProduct)
 router.get('/by-category', getProductsByCategory)
+router.get('/low-stock', protect, admin, getLowStockProducts)
 router.get('/:id', getProductById)
 router.put('/:id/edit', protect, admin, updateProduct);
 router.delete('/:id/delete', protect, admin, deleteProduct);
+
 
 
 module.exports = router

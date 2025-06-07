@@ -2,6 +2,8 @@ const Order = require('../models/Order')
 const Product = require('../models/Product')
 const User = require('../models/User')
 const bcrypt = require('bcryptjs')
+const sendEmail = require('../utils/sendEmail')
+
 
 //view admin dashboard [ total orders, Ravenues, users, products etc]
 exports.getDashboardSummary = async (req, res) => {
@@ -20,7 +22,7 @@ exports.getDashboardSummary = async (req, res) => {
           totalRevenue: { $sum: '$totalPrice' }
         }
       }
-    ]);
+    ])
 
     const orderStats = await Order.aggregate([
       {
@@ -29,12 +31,53 @@ exports.getDashboardSummary = async (req, res) => {
           count: { $sum: 1 }
         }
       }
-    ]);
+    ])
 
     const formattedStats = orderStats.reduce((acc, stat) => {
       acc[stat._id] = stat.count;
       return acc;
-    }, {});
+    }, {})
+
+    // Orders and Revenue by Month
+    const stats = await Order.aggregate([
+      {
+        $group: {
+          _id: { $month: '$createdAt' },
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: '$totalPrice' },
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ])
+
+    //Top-Selling Products
+    const topProducts = await Order.aggregate([
+      { $unwind: '$orderItems' },
+      {
+        $group: {
+          _id: '$orderItems.product',
+          totalSold: { $sum: '$orderItems.quantity' },
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      { $unwind: '$product' },
+      {
+        $project: {
+          name: '$product.name',
+          totalSold: 1,
+          stock: '$product.stock'
+        }
+      },
+      { $sort: { totalSold: -1 } },
+      { $limit: 5 }
+    ])
 
     res.status(200).json({
       totalOrders,
@@ -46,8 +89,12 @@ exports.getDashboardSummary = async (req, res) => {
         processing: formattedStats['processing'] || 0,
         completed: formattedStats['completed'] || 0,
         cancelled: formattedStats['cancelled'] || 0,
-      }
+      },
+      stats,
+      topProducts
     });
+
+
 
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch dashboard summary.', error: error.message });

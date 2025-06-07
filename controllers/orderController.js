@@ -17,9 +17,7 @@ const Product = require('../models/Product')
 // }
 
 
-/* @desc   Admin: Get all orders with optional filters--- All oreders, userId, status, dateRange,
- @route  GET /api/orders/admin
- @access Private/Admin*/
+/*  Admin: Get all orders with optional filters--- All oreders, userId, status, dateRange,*/
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
     const { status, user, startDate, endDate } = req.query
@@ -187,9 +185,8 @@ exports.placeOrder = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 }
-// @desc    Get all orders by user ID (Admin only)
-// @route   GET /api/orders/:userId
-// @access  Private/Admin
+//   Get all orders by user ID (Admin only)
+
 // exports.getOrdersByUserId = async (req, res) => {
 //     try {
 //       const orders = await Order.find({ user: req.params.userId })
@@ -206,10 +203,7 @@ exports.placeOrder = async (req, res) => {
 //     }
 //   }
 
-// @desc Mark order as paid
-// @route PUT /api/orders/:id/pay
-// @access Private/Admin or after payment webhook
-
+/* Mark order as paid */
 exports.markOrderAsPaid = async (req, res) => {
     try {
       const order = await Order.findById(req.params.id)
@@ -228,9 +222,7 @@ exports.markOrderAsPaid = async (req, res) => {
       res.status(500).json({ message: error.message })
     }
   }
-  // @desc Update order status (pending, processing, completed)
-  // @route PUT /api/orders/:id/status
-  // @access Private/Admin
+  // Update order status (pending, processing, completed)
 exports.updateOrderStatus = async (req, res) => {
     const { status } = req.body;
   
@@ -301,9 +293,6 @@ exports.updateOrderStatus = async (req, res) => {
     }
   }
 
-// @desc Cancel an order
-// @route PUT /api/orders/:id/cancel
-// @access Private (user or admin)
 exports.cancelOrder = async (req, res) => {
     const { id } = req.params
     const { status } = req.body
@@ -399,8 +388,7 @@ exports.cancelOrder = async (req, res) => {
     }
   }
 
-  //updateOrder(Owner)... owner should be able to update his/her order
-  //deleteOrder(admin) -- make sure the order to be deleted is a cancelled order
+//updateOrder(Owner)... owner should be able to update his/her order
   
 
 

@@ -1,5 +1,5 @@
 const Product = require('../models/Product')
-const Category = require('../models/Category')
+// const Category = require('../models/Category')
 
 exports.createProduct = async (req, res) => {
 
@@ -132,5 +132,25 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ message : 'server error', error : error.message})
   }
 }
+
+exports.getLowStockProducts = async (req, res) => {
+  try {
+    const threshold = Number(req.query.threshold) || 100;
+
+    const lowStockProducts = await Product.find({ stock: { $lt: threshold } })
+      .select('name stock price category') // minimal fields
+      .sort({ stock: 1 })
+
+    res.status(200).json({
+      count: lowStockProducts.length,
+      threshold,
+      products: lowStockProducts,
+    })
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
 
 

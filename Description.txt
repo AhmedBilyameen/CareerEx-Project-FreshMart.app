@@ -1,0 +1,9 @@
+POSTMAN:
+
+Collection details
+URL for published documentation
+
+LINK: https://documenter.getpostman.com/view/44410477/2sB2x3mt2j
+
+Collection name
+CareerEx-Project-FreshMart.app
