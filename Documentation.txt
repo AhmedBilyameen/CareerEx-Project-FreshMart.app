@@ -1,0 +1,11 @@
+POSTMAN:
+
+Collection details
+URL for published documentation
+
+LINK: https://documenter.getpostman.com/view/44410477/2sB2x3mt2j
+
+Collection name
+CareerEx-Project-FreshMart.app
+
+we are coming to the end of this project now I want you to create a general Readme notes from the beginning to the end of this project make it unique, professional and standout.
